@@ -1,0 +1,95 @@
+﻿@inject StoredItems stored
+@using Models
+<div class="top-row pl-4 navbar navbar-dark">
+    <a class="navbar-brand" href="">@orgname</a>
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav flex-column">
+        @foreach (var page in Pages)
+        {
+            var link = page.Link;
+            var text = page.Text;
+            <li class="nav-item px-1">
+                <NavLink class="nav-link" href="@link" Match="NavLinkMatch.All" @onclick="() => HandleClick(page)">
+                    <span class="oi oi-chevron-right" aria-hidden="true"></span> @text
+                </NavLink>
+            </li>
+        }
+            @if (stored.getIsSelected() == true)
+            {
+                <li class="nav-item px-1">
+                    <NavLink class="nav-link" href="Projects">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Carbon Mitigation Projects
+                    </NavLink>
+                </li>
+                <li class="nav-item px-1">
+                    <NavLink class="nav-link" href="CarbonImpact">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Carbon Impacts
+                    </NavLink>
+                </li>
+                <li class="nav-item px-1">
+                    <NavLink class="nav-link" href="SocialMit">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Social Mitigation Projects
+                    </NavLink>
+                </li>
+                <li class="nav-item px-1">
+                    <NavLink class="nav-link" href="SocialImpact">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Social Impacts
+                    </NavLink>
+                </li>
+                <li class="nav-item px-1">
+                    <NavLink class="nav-link" href="ReductionValues">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Carbon Reduction Report
+                    </NavLink>
+                </li>
+                <li class="nav-item px-1">
+                    <NavLink class="nav-link" href="SocialReduction">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Social Reduction Report
+                    </NavLink>
+                </li>
+             }
+
+            else
+            {
+
+            }
+    </ul>
+</div>
+
+@code {
+    @inject NavigationManager NavigationManager;
+
+    private OrganisationDTO OrganisationModel;
+
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    string orgname;
+
+    private List<Page> Pages { get; set; } = new List<Page>
+    {
+        new Page {Id = 1, Link = "", Text="Organisation Page"},
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        OrganisationModel = stored.getOrganisation();
+        orgname = OrganisationModel.OrganisationName;
+    }
+
+    private void HandleClick(Page page)
+    {
+        NavigationManager.NavigateTo(page.Link, true);
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+}

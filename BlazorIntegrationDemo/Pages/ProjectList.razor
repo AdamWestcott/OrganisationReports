@@ -1,0 +1,87 @@
+﻿@page "/Projects"
+@using Telerik.ReportViewer.Blazor;
+@using Models
+@using Business.Repository.IRepository
+@inject IProjectsRepository ProjectRepository
+@inject NavigationManager NavigationManager
+@inject StoredItems stored
+
+<div class=" row mt-4">
+    <div class="col-8">
+        <header>
+            <h1>  @orgname</h1>
+        </header>
+    </div>
+    <div class="col-3 offset-1">
+        <NavLink href="project/create" class="btn btn-info form-control">Add New Project</NavLink>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-12">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Progress</th>
+                    <th>KgCo2e Reduction</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>
+
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Projects != null)
+                {
+                    foreach (var project in Projects)
+                    {
+                <tr>
+                    <td>@project.CarbonName</td>
+                    <td>@project.CarbonDescription</td>
+                    <td>@project.CarbonProgress</td>
+                    <td>@project.KgCo2e</td>
+                    <td>@project.CarbonStartDate.ToString("dd/MM/yyyy")</td>
+                    <td>@project.CarbonEndDate.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <NavLink href="@($"project/edit/{project.CarbonID}")" class="btn btn-primary">Edit</NavLink>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger" @onclick="()=>HandleDelete(project.CarbonID)">Delete</button>
+                    </td>
+                </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+@code {
+    private IEnumerable<ProjectsDTO> Projects { get; set; } = new List<ProjectsDTO>();
+    private string? DeleteID { get; set; } = null;
+    private OrganisationDTO OrganisationModel;
+    string orgname = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            Projects = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Mitigation");
+            orgname = " " + OrganisationModel.OrganisationName + " Carbon Reduction Projects";
+        }
+    }
+
+    private async Task HandleDelete(string roomId)
+    {
+        DeleteID = roomId;
+        var DeleteEmployee = await ProjectRepository.DeleteProject(DeleteID);
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+}
+

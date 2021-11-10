@@ -1,0 +1,542 @@
+﻿@page "/ReductionValues"
+@using Models
+@using Business.Repository.IRepository
+@using System.Data;
+@inject ICarbonDbItemsRepository CarbonRepository
+@inject NavigationManager NavigationManager
+@inject IProjectsRepository ProjectRepository
+@inject StoredItems stored
+@inject CustomReportSourceResolver customReport
+<div class="row mt-2 mb-5">
+    <h3 class="card-title text-info mb-3 ml-3">Input Carbon Reduction Report Details</h3>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="CarbonReductionInfoModel" OnValidSubmit="CarbonReductionInfoSender">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-group">
+                        <label>Additional Details</label>
+                        <label>
+                            [Please provide details of your organisation’s baseline emissions below. If your organisation
+                            has not previously assessed or reported emissions, please detail this below and use your
+                            first reporting period as your Baseline.]
+                        </label>
+                        <InputText @bind-Value="CarbonReductionInfoModel.AdditionalDetails" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>End Year</label>
+                        <InputText @bind-Value="CarbonReductionInfoModel.EndYear" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>Reporting Year</label>
+                        <InputText @bind-Value="CarbonReductionInfoModel.ReportingYear" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>BaseLine Year</label>
+                        <InputText @bind-Value="CarbonReductionInfoModel.BaselineYear" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>Predicted Carbon Output in Five Years</label>
+                        <InputNumber @bind-Value="CarbonReductionInfoModel.PredictedFiveYearReduction" class="form-control"></InputNumber>
+                    </div>
+                    <div class="form-group d-flex  justify-content-between text-nowrap">
+                        <label>Do you wish the Report to be PPN0621 Compliant?</label>
+                        <InputCheckbox @bind-Value="WhichReport" class="form-control float-sm-left"></InputCheckbox>   
+                    </div>
+                    <div class="form-group " >
+                        <button class="btn btn-primary">Create Report</button>
+                        <NavLink href="/" class="btn btn-secondary">Back to Index</NavLink>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    //Variable to Store CarbonReductionInfo Information
+    private CarbonReductionInfoDTO CarbonReductionInfoModel { get; set; } = new CarbonReductionInfoDTO();
+    //Lists for Carbon Emissions - all carbon emissions, impacts and mitigations
+    private IEnumerable<ProjectsDTO> CarbonImpacts { get; set; } = new List<ProjectsDTO>();
+    private IEnumerable<ProjectsDTO> CarbonMitigations { get; set; } = new List<ProjectsDTO>();
+    private IEnumerable<ProjectsDTO> allCarbons { get; set; } = new List<ProjectsDTO>();
+    //variable to store organisation Model
+    private OrganisationDTO OrganisationModel;
+
+    bool WhichReport;
+
+    //String Variables
+    string orgname = "";
+    string upcomingProjects = "";
+    string CompletedProjects = "";
+    double scope1Total = 0.0;
+    double scope2Total = 0.0;
+    double scope3Total = 0.0;
+    double Baselinescope1Total = 0.0;
+    double Baselinescope2Total = 0.0;
+    double Baselinescope3Total = 0.0;
+    double baselineYearTotal = 0.0;
+    double baselineSubtractor = 0.0;
+    double achievedCarbonReduction = 0.0;
+    double baselineCarbon = 0.0;
+    double scope1carb = 0.0;
+    double scope2carb = 0.0;
+    double scope3carb = 0.0;
+    double baselinescope1carb = 0.0;
+    double baselinescope2carb = 0.0;
+    double baselinescope3carb = 0.0;
+
+    //Datatable Variables
+    DataTable ReducedCarbon = new DataTable("ReducedCarbon");
+    DataTable PPNCompliantReducedCarbon = new DataTable("PPNCompliantReducedCarbon");
+    DataTable ReducedCarbonPieChartOne = new DataTable("ReducedPieChartOne");
+    DataTable ReducedCarbonBarChart = new DataTable("ReducedPieChartOne");
+    DataTable ReducedCarbonScopes = new DataTable("ReducedCarbonScopes");
+    DataTable ReducedCarbonUpcomingProjects = new DataTable("ReducedCarbonUpcomingProjects");
+    DataTable ReducedCarbonCompletedProjects = new DataTable("ReducedCarbonCompletedProjects");
+    DataTable ExceptionProjects = new DataTable("ExcepetionProjects");
+
+    protected override async Task OnInitializedAsync()
+    {
+        WhichReport = true;
+        //Sets organisationModel to the selected organisation in storeditems class
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            //sets the data in the IEnumerable lists
+            allCarbons = await ProjectRepository.GetAllProjects(OrganisationModel.OrganisationID);
+            CarbonImpacts = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Emission");
+            CarbonMitigations = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Mitigation");
+            //sets the organisation name
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+    }
+
+    private async Task CarbonReductionInfoSender()
+    {
+        //creates datatable
+
+        //sets the total carbon for each scope by subtracting mitigations from emissions for each year
+        foreach (ProjectsDTO a in allCarbons)
+        {
+            if (a.CarbonScope != null && a.CarbonScope == "Scope 1" && a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && a.CarbonType == "Emission")
+            {
+                if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                {
+                    scope1carb = a.YearlyKgCo2e;
+                }
+                else
+                {
+                    scope1carb = a.KgCo2e;
+                }
+            }
+
+            else if (a.CarbonScope != null && a.CarbonScope == "Scope 1" && a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && a.CarbonType == "Mitigation")
+            {
+                if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                {
+                    scope1carb = (a.YearlyKgCo2e) *-1;;
+                }
+
+                else
+                {
+                    scope1carb = (a.KgCo2e) * -1;
+                }
+            }
+
+            else
+            {
+                scope1carb = 0;
+            }
+
+            if (a.CarbonScope != null && a.CarbonScope == "Scope 2" && a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && a.CarbonType == "Emission")
+            {
+                if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                {
+                    scope2carb = a.YearlyKgCo2e;
+                }
+                else
+                {
+                    scope2carb = a.KgCo2e;
+                }
+            }
+
+            else if (a.CarbonScope != null && a.CarbonScope == "Scope 2" && a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && a.CarbonType == "Mitigation")
+            {
+                if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                {
+                    scope2carb = (a.YearlyKgCo2e) * -1; ;
+                }
+
+                else
+                {
+                    scope2carb = (a.KgCo2e) * -1;
+                }
+            }
+
+            else
+            {
+                scope2carb = 0;
+            }
+
+            if (a.CarbonScope != null && a.CarbonScope == "Scope 3" && a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && a.CarbonType == "Emission")
+            {
+                if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                {
+                    scope3carb = a.YearlyKgCo2e;
+                }
+                else
+                {
+                    scope3carb = a.KgCo2e;
+                }
+            }
+
+            else if (a.CarbonScope != null && a.CarbonScope == "Scope 3" && a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && a.CarbonType == "Mitigation")
+            {
+                if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                {
+                    scope3carb = (a.YearlyKgCo2e) * -1; ;
+                }
+
+                else
+                {
+                    scope3carb = (a.KgCo2e) * -1;
+                }
+            }
+
+            else
+            {
+                scope3carb = 0;
+            }
+
+            scope1Total += scope1carb;
+            scope2Total += scope2carb;
+            scope3Total += scope3carb;
+
+            if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.BaselineYear))
+            {
+                if (a.CarbonScope != null && a.CarbonScope == "Scope 1" && a.CarbonType == "Emission")
+                {
+                    if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                    {
+                        baselinescope1carb = a.YearlyKgCo2e;
+                    }
+
+                    else
+                    {
+                        baselinescope1carb = a.KgCo2e;
+                    }
+                }
+
+                else if (a.CarbonScope != null && a.CarbonScope == "Scope 1" && a.CarbonType == "Mitigation")
+                {
+                    if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                    {
+                        baselinescope1carb = (a.YearlyKgCo2e) * -1; ;
+                    }
+
+                    else
+                    {
+                        baselinescope1carb = (a.KgCo2e) * -1;
+                    }
+                }
+
+                else
+                {
+                    baselinescope1carb = 0;
+                }
+
+                if (a.CarbonScope != null && a.CarbonScope == "Scope 2" && a.CarbonType == "Emission")
+                {
+                    if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                    {
+                        baselinescope2carb = a.YearlyKgCo2e;
+                    }
+
+                    else
+                    {
+                        baselinescope2carb = a.KgCo2e;
+                    }
+                }
+
+                else if (a.CarbonScope != null && a.CarbonScope == "Scope 2" && a.CarbonType == "Mitigation")
+                {
+                    if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                    {
+                        baselinescope2carb = (a.YearlyKgCo2e) * -1; ;
+                    }
+
+                    else
+                    {
+                        baselinescope2carb = (a.KgCo2e) * -1;
+                    }
+                }
+
+                else
+                {
+                    baselinescope2carb = 0;
+                }
+
+                if (a.CarbonScope != null && a.CarbonScope == "Scope 3" && a.CarbonType == "Emission")
+                {
+                    if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                    {
+                        baselinescope3carb = a.YearlyKgCo2e;
+                    }
+
+                    else
+                    {
+                        baselinescope3carb = a.KgCo2e;
+                    }
+                }
+
+                else if (a.CarbonScope != null && a.CarbonScope == "Scope 3" && a.CarbonType == "Mitigation")
+                {
+                    if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((a.CarbonEndDate - a.CarbonStartDate).Days < 364))
+                    {
+                        baselinescope3carb = (a.YearlyKgCo2e) * -1;
+                    }
+
+                    else
+                    {
+                        baselinescope3carb = (a.KgCo2e) * -1;
+                    }
+                }
+
+                else
+                {
+                    baselinescope3carb = 0;
+                }
+
+                Baselinescope1Total += baselinescope1carb;
+                Baselinescope2Total += baselinescope2carb;
+                Baselinescope3Total += baselinescope3carb;
+            }
+        }
+
+        //sets the upcoming and completed projects from the project list
+        foreach (ProjectsDTO a in CarbonMitigations)
+        {
+            if (a.CarbonProgress == "Predicted")
+            {
+                upcomingProjects += a.CarbonName + " is predicted to mitigate " + a.KgCo2e + " KgCo2e" + " by " + a.CarbonEndDate.Year + Environment.NewLine + Environment.NewLine; ;
+            }
+
+            if (a.CarbonProgress == "Actual")
+            {
+                CompletedProjects += a.CarbonName + " has mitigated " + a.KgCo2e + "KgCo2e" + Environment.NewLine + Environment.NewLine;
+                achievedCarbonReduction += a.KgCo2e;
+            }
+        }
+
+        //sets values
+        CarbonReductionInfoModel.CompletedProjects = CompletedProjects;
+        CarbonReductionInfoModel.UpcomingProjects = upcomingProjects;
+        CarbonReductionInfoModel.OrganisationName = orgname;
+        CarbonReductionInfoModel.AchievedReduction = achievedCarbonReduction;
+
+        CarbonReductionInfoModel.Scope1Total = Math.Round(scope1Total,2);
+        CarbonReductionInfoModel.Scope2Total = Math.Round(scope2Total,2);
+        CarbonReductionInfoModel.Scope3Total = Math.Round(scope3Total,2);
+        CarbonReductionInfoModel.Total = Math.Round(scope1Total,2) + Math.Round(scope2Total,2) + Math.Round(scope3Total,2);
+
+        CarbonReductionInfoModel.BaselineScope1Total = Math.Round(Baselinescope1Total,2);
+        CarbonReductionInfoModel.BaselineScope2Total = Math.Round(Baselinescope2Total,2);
+        CarbonReductionInfoModel.BaselineScope3Total = Math.Round(Baselinescope3Total,2);
+        CarbonReductionInfoModel.BaselineTotal = Math.Round(Baselinescope1Total,2) + Math.Round(Baselinescope2Total,2) + Math.Round(Baselinescope3Total,2);
+
+        //create datatable coloumns
+        ReducedCarbon.Columns.Add("Years", typeof(int));
+        ReducedCarbon.Columns.Add("AmountOfCarbon", typeof(double));
+        ReducedCarbon.Columns.Add("Type", typeof(string));
+
+        PPNCompliantReducedCarbon.Columns.Add("Years", typeof(int));
+        PPNCompliantReducedCarbon.Columns.Add("AmountOfCarbon", typeof(double));
+        PPNCompliantReducedCarbon.Columns.Add("Type", typeof(string));
+
+        foreach (ProjectsDTO baseline in allCarbons)
+        {
+            if (baseline.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && baseline.CarbonType == "Emission")
+            {
+                baselineCarbon = Convert.ToDouble(baseline.KgCo2e);
+            }
+
+            else if (baseline.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && baseline.CarbonType == "Mitigation")
+            {
+                baselineCarbon = (Convert.ToDouble(baseline.KgCo2e) * -1);
+            }
+
+            else
+            {
+                baselineCarbon = 0;
+            }
+
+            baselineYearTotal += baselineCarbon;
+
+        }
+
+        ReducedCarbon.Rows.Add(new object[] { Convert.ToInt32(CarbonReductionInfoModel.BaselineYear), baselineYearTotal, "Actual" });
+        PPNCompliantReducedCarbon.Rows.Add(new object[] { Convert.ToInt32(CarbonReductionInfoModel.BaselineYear), baselineYearTotal, "Actual" });
+
+        double actualCarbon =0;
+
+        foreach (ProjectsDTO actual in allCarbons)
+        {
+
+            if (actual.CarbonEndDate.Year > Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && actual.CarbonEndDate.Year <= Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && actual.CarbonProgress == "Actual" && actual.CarbonType == "Emission")
+            {
+                actualCarbon = actual.KgCo2e;
+                ReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Actual" });
+                PPNCompliantReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Actual" });
+            }
+
+            else if (actual.CarbonEndDate.Year > Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && actual.CarbonEndDate.Year <= Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && actual.CarbonProgress == "Actual" && actual.CarbonType == "Mitigation")
+            {
+                actualCarbon = (actual.KgCo2e) * -1;
+                ReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Actual" });
+                PPNCompliantReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Actual" });
+            }
+
+            if (actual.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && actual.CarbonProgress == "Actual")
+            {
+                PPNCompliantReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Predicted" });
+                ReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Predicted" });
+            }
+        }
+
+
+
+        double predictedCarbon;
+        foreach (ProjectsDTO predicted in allCarbons)
+        {
+            if (predicted.CarbonEndDate.Year >= Convert.ToInt32(CarbonReductionInfoModel.ReportingYear)+1 && predicted.CarbonEndDate.Year <= Convert.ToInt32(CarbonReductionInfoModel.EndYear) && predicted.CarbonProgress == "Predicted" && predicted.CarbonType == "Emission")
+            {
+                predictedCarbon = predicted.KgCo2e;
+                PPNCompliantReducedCarbon.Rows.Add(new object[] { predicted.CarbonEndDate.Year, predictedCarbon, "Predicted" });
+                ReducedCarbon.Rows.Add(new object[] { predicted.CarbonEndDate.Year, predictedCarbon, "Predicted" });
+            }
+
+            else if (predicted.CarbonEndDate.Year >= Convert.ToInt32(CarbonReductionInfoModel.ReportingYear)+1 && predicted.CarbonEndDate.Year <= Convert.ToInt32(CarbonReductionInfoModel.EndYear) && predicted.CarbonProgress == "Predicted" && predicted.CarbonType == "Mitigation")
+            {
+                predictedCarbon = (predicted.KgCo2e) * -1;
+                PPNCompliantReducedCarbon.Rows.Add(new object[] { predicted.CarbonEndDate.Year, predictedCarbon, "Predicted" });
+                ReducedCarbon.Rows.Add(new object[] { predicted.CarbonEndDate.Year, predictedCarbon, "Predicted" });
+            }
+
+        }
+
+        PPNCompliantReducedCarbon.Rows.Add(new object[] { Convert.ToInt32(CarbonReductionInfoModel.BaselineYear), baselineYearTotal, "Target Emissions" });
+        baselineSubtractor = baselineYearTotal / (Convert.ToInt32(CarbonReductionInfoModel.EndYear) - Convert.ToInt32(CarbonReductionInfoModel.BaselineYear));
+
+        for (int i = Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) + 1; i <= Convert.ToInt32(CarbonReductionInfoModel.EndYear); i++)
+        {
+            PPNCompliantReducedCarbon.Rows.Add(new object[] { i, (Math.Round(baselineYearTotal - baselineSubtractor,2)), "Target Emissions" });
+            baselineYearTotal = baselineYearTotal - baselineSubtractor;
+        }
+
+        actualCarbon = 0;
+        //May be used in future is the predicted graph for carbon reduction report - has a completly seperate line from the actual
+        //foreach (ProjectsDTO actual in allCarbons)
+        //{
+        //    if (actual.CarbonEndDate.Year >= Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && actual.CarbonEndDate.Year <= Convert.ToInt32(CarbonReductionInfoModel.EndYear) && actual.CarbonProgress == "Predicted" && actual.CarbonType == "Emission")
+        //    {
+        //        actualCarbon = actual.KgCo2e;
+        //    }
+
+        //    else if (actual.CarbonEndDate.Year >= Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && actual.CarbonEndDate.Year <= Convert.ToInt32(CarbonReductionInfoModel.EndYear) && actual.CarbonProgress == "Predicted" && actual.CarbonType == "Mitigation")
+        //    {
+        //        actualCarbon = (actual.KgCo2e) * -1;
+        //    }
+
+        //    ReducedCarbon.Rows.Add(new object[] { actual.CarbonEndDate.Year, actualCarbon, "Predicted" });
+        //    actualCarbon = 0;
+        //}
+
+        ReducedCarbonPieChartOne.Columns.Add("Name", typeof(string));
+        ReducedCarbonPieChartOne.Columns.Add("KgCo2e", typeof(double));
+        ReducedCarbonPieChartOne.Columns.Add("EndDate", typeof(string));
+
+        foreach (ProjectsDTO actual in CarbonMitigations)
+        {
+            ReducedCarbonPieChartOne.Rows.Add(new object[] { actual.CarbonName, actual.KgCo2e, actual.CarbonEndDate.Year });
+        }
+
+        ReducedCarbonScopes.Columns.Add("Name", typeof(string));
+        ReducedCarbonScopes.Columns.Add("Scope", typeof(string));
+        ReducedCarbonScopes.Columns.Add("KgCo2e", typeof(double));
+        ReducedCarbonScopes.Columns.Add("EndDate", typeof(string));
+
+        foreach (ProjectsDTO actual in CarbonImpacts)
+        {
+            if (actual.CarbonEndDate.Year >= Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && actual.CarbonEndDate.Year <= (Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) + 5))
+            {
+                ReducedCarbonScopes.Rows.Add(new object[] { actual.CarbonName, actual.CarbonScope, actual.KgCo2e, actual.CarbonEndDate.Year });
+            }
+        }
+
+        ReducedCarbonCompletedProjects.Columns.Add("Name", typeof(string));
+        ReducedCarbonCompletedProjects.Columns.Add("Description", typeof(string));
+        ReducedCarbonCompletedProjects.Columns.Add("StartDate", typeof(string));
+        ReducedCarbonCompletedProjects.Columns.Add("EndDate", typeof(string));
+        ReducedCarbonCompletedProjects.Columns.Add("KgCo2e", typeof(double));
+
+        ReducedCarbonUpcomingProjects.Columns.Add("Name", typeof(string));
+        ReducedCarbonUpcomingProjects.Columns.Add("Description", typeof(string));
+        ReducedCarbonUpcomingProjects.Columns.Add("StartDate", typeof(string));
+        ReducedCarbonUpcomingProjects.Columns.Add("EndDate", typeof(string));
+        ReducedCarbonUpcomingProjects.Columns.Add("KgCo2e", typeof(double));
+
+        foreach (ProjectsDTO completed in CarbonMitigations)
+        {
+            if (completed.CarbonProgress == "Actual")
+            {
+                ReducedCarbonCompletedProjects.Rows.Add(new object[] { completed.CarbonName, completed.CarbonDescription, completed.CarbonStartDate.Year, completed.CarbonEndDate.Year, completed.KgCo2e });
+            }
+        }
+
+        foreach (ProjectsDTO upcoming in CarbonMitigations)
+        {
+            if (upcoming.CarbonProgress == "Predicted")
+            {
+                ReducedCarbonUpcomingProjects.Rows.Add(new object[] { upcoming.CarbonName, upcoming.CarbonDescription, upcoming.CarbonStartDate.Year, upcoming.CarbonEndDate.Year, upcoming.KgCo2e });
+            }
+        }
+
+        ExceptionProjects.Columns.Add("Name", typeof(string));
+        ExceptionProjects.Columns.Add("StartDate", typeof(string));
+        ExceptionProjects.Columns.Add("EndDate", typeof(string));
+        ExceptionProjects.Columns.Add("KgCo2e", typeof(double));
+
+        //Exception Report Items
+        foreach (ProjectsDTO all in allCarbons)
+        {
+            if (all.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((all.CarbonEndDate - all.CarbonStartDate).Days < 364))
+            {
+                ExceptionProjects.Rows.Add(all.CarbonName, all.CarbonStartDate.Date, all.CarbonEndDate.Date, all.KgCo2e);
+            }
+        }
+
+
+
+        stored.setCarbonReductionInfoList(CarbonReductionInfoModel);
+        customReport.SetCarbonGraphDataTable(ReducedCarbon);
+        customReport.SetCarbonPieChartOneDataTable(ReducedCarbonPieChartOne);
+        customReport.SetCarbonBarChartDataTable(ReducedCarbonScopes);
+        customReport.SetCarbonCompletedProjectDataTable(ReducedCarbonCompletedProjects);
+        customReport.SetCarbonUpcomingProjecthDataTable(ReducedCarbonUpcomingProjects);
+        customReport.SetCarbonExceptionDataTable(ExceptionProjects);
+        customReport.SetPPNCompliantCarbonGraphDataTable(PPNCompliantReducedCarbon);
+        if(WhichReport == true)
+        {
+            NavigationManager.NavigateTo("PPN0621CompliantCarbonReductionReport");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("report");
+        }
+
+
+    }
+}
+

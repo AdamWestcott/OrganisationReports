@@ -1,0 +1,357 @@
+﻿@page "/SocialReduction"
+@using Models
+@using Business.Repository.IRepository
+@using System.Data;
+@inject ICarbonDbItemsRepository CarbonRepository
+@inject NavigationManager NavigationManager
+@inject ISocialRepository SocialRepository
+@inject StoredItems stored
+@inject CustomReportSourceResolver customReport
+<div class="row mt-2 mb-5">
+    <h3 class="card-title text-info mb-3 ml-3">Input Carbon Reduction Report Details</h3>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="SocialReductionInfoModel" OnValidSubmit="CarbonReductionInfoSender">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-group">
+                        <label>Additional Details</label>
+                        <label>
+                            [Please provide details of your organisation’s baseline emissions below. If your organisation
+                            has not previously assessed or reported emissions, please detail this below and use your
+                            first reporting period as your Baseline.]
+                        </label>
+                        <InputText @bind-Value="SocialReductionInfoModel.AdditionalDetails" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>Reporting Year</label>
+                        <InputText @bind-Value="SocialReductionInfoModel.ReportingYear" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>BaseLine Year</label>
+                        <InputText @bind-Value="SocialReductionInfoModel.BaselineYear" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>Predicted Carbon Output in Five Years</label>
+                        <InputNumber @bind-Value="SocialReductionInfoModel.PredictedFiveYearReduction" class="form-control"> @SocialReductionInfoModel.Currency</InputNumber>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary">Create Report</button>
+                        <NavLink href="/" class="btn btn-secondary">Back to Index</NavLink>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    private SocialReductionInfoDTO SocialReductionInfoModel { get; set; } = new SocialReductionInfoDTO();
+    private IEnumerable<SocialDTO> SocialImpacts { get; set; } = new List<SocialDTO>();
+    private IEnumerable<SocialDTO> SocialMitigations { get; set; } = new List<SocialDTO>();
+    private IEnumerable<SocialDTO> allSocials { get; set; } = new List<SocialDTO>();
+    private IEnumerable<SocialReductionInfoDTO> SocialReductionInfoList { get; set; } = new List<SocialReductionInfoDTO>();
+    private OrganisationDTO OrganisationModel;
+    DataTable ReducedSocialCompleted = new DataTable("ReducedSocialCompleted");
+    DataTable ReducedSocialUpcoming = new DataTable("ReducedSocialUpcoming");
+    DataTable ReducedSocialGraph = new DataTable("ReducedSocialGraph");
+
+    string orgname = "";
+    string upcomingProjects = "";
+    string CompletedProjects = "";
+
+    double GrowthTotal = 0.0;
+    double JobTotal = 0.0;
+    double EnvironmentTotal = 0.0;
+    double SocialTotal = 0.0;
+    double InnovationTotal = 0.0;
+    double ReportingTotal = 0.0;
+
+    double BaselineGrowthTotal = 0.0;
+    double BaselineJobTotal = 0.0;
+    double BaselineSocialTotal = 0.0;
+    double BaselineInnovationTotal = 0.0;
+    double BaselineEnvironmentTotal = 0.0;
+    double baselineYearTotal = 0.0;
+
+    double baselineSubtractor = 0.0;
+    double achievedCarbonReduction = 0.0;
+    double baselineCarbon = 0.0;
+
+    double growth = 0.0;
+    double job = 0.0;
+    double environment = 0.0;
+    double social = 0.0;
+    double innovation = 0.0;
+
+    double baselinegrowth = 0.0;
+    double baselinejob = 0.0;
+    double baselineenvironment = 0.0;
+    double baselinesocial = 0.0;
+    double baselineinnovation = 0.0;
+
+    StoredItems s = new StoredItems();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // CarbonDbItems = await CarbonRepository.GetAllCarbonDbItems();
+
+
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            allSocials= await SocialRepository.GetAllSocials(OrganisationModel.OrganisationID);
+            SocialImpacts = await SocialRepository.GetAllSocialsOfType(OrganisationModel.OrganisationID, "Impact");
+            SocialMitigations = await SocialRepository.GetAllSocialsOfType(OrganisationModel.OrganisationID, "Mitigation");
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+    }
+
+    private async Task CarbonReductionInfoSender()
+    {
+
+
+        foreach(SocialDTO a in allSocials)
+        {
+            if (a.Theme != null && a.Theme == "Growth" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Impact")
+            {
+                growth = a.SocialValue;
+            }
+
+            else if (a.Theme != null && a.Theme == "Growth" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Mitigation")
+            {
+                growth = (a.SocialValue) * -1;
+            }
+
+            else
+            {
+                growth = 0;
+            }
+
+            if (a.Theme != null && a.Theme == "Jobs" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Impact")
+            {
+                job = a.SocialValue;
+            }
+
+            else if (a.Theme != null && a.Theme == "Jobs" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Mitigation")
+            {
+                job = (a.SocialValue) * -1;
+            }
+
+            else
+            {
+                job = 0;
+            }
+
+            if (a.Theme != null && a.Theme == "Environment" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Impact")
+            {
+                environment = a.SocialValue;
+            }
+
+            else if (a.Theme != null && a.Theme == "Environment" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Mitigation")
+            {
+                environment = (a.SocialValue) * -1;
+            }
+
+            else
+            {
+                environment = 0;
+            }
+
+            if (a.Theme != null && a.Theme == "Social" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Impact")
+            {
+                social = a.SocialValue;
+            }
+
+            else if (a.Theme != null && a.Theme == "Social" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Mitigation")
+            {
+                social = (a.SocialValue) * -1;
+            }
+
+            else
+            {
+                social = 0;
+            }
+
+            if (a.Theme != null && a.Theme == "Innovation" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Impact")
+            {
+                innovation = a.SocialValue;
+            }
+
+            else if (a.Theme != null && a.Theme == "Innovation" && a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && a.SocialType == "Mitigation")
+            {
+                innovation = (a.SocialValue) * -1;
+            }
+
+            else
+            {
+                innovation = 0;
+            }
+
+
+            GrowthTotal += growth;
+            JobTotal += job;
+            EnvironmentTotal += environment;
+            SocialTotal += social;
+            InnovationTotal += innovation;
+
+            if (a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.BaselineYear))
+            {
+                if (a.Theme != null && a.Theme == "Growth" && a.SocialType == "Impact")
+                {
+                    baselinegrowth = a.SocialValue;
+                }
+
+                else if (a.Theme != null && a.Theme == "Growth" && a.SocialType == "Mitigation")
+                {
+                    baselinegrowth = (a.SocialValue) * -1;
+                }
+
+                else
+                {
+                    baselinegrowth = 0;
+                }
+
+                if (a.Theme != null && a.Theme == "Jobs" && a.SocialType == "Impact")
+                {
+                    baselinejob = a.SocialValue;
+                }
+
+                else if (a.Theme != null && a.Theme == "Jobs" && a.SocialType == "Mitigation")
+                {
+                    baselinejob = (a.SocialValue) * -1;
+                }
+
+                else
+                {
+                    baselinejob = 0;
+                }
+
+                if (a.Theme != null && a.Theme == "Environment" && a.SocialType == "Impact")
+                {
+                    baselineenvironment = a.SocialValue;
+                }
+
+                else if (a.Theme != null && a.Theme == "Environment" && a.SocialType == "Mitigation")
+                {
+                    baselineenvironment = (a.SocialValue) * -1;
+                }
+
+                else
+                {
+                    baselineenvironment = 0;
+                }
+
+                if (a.Theme != null && a.Theme == "Social" && a.SocialType == "Impact")
+                {
+                    baselinesocial = a.SocialValue;
+                }
+
+                else if (a.Theme != null && a.Theme == "Social" && a.SocialType == "Mitigation")
+                {
+                    baselinesocial = (a.SocialValue) * -1;
+                }
+
+                else
+                {
+                    baselinesocial = 0;
+                }
+
+                if (a.Theme != null && a.Theme == "Innovation" && a.SocialType == "Impact")
+                {
+                    baselineinnovation = a.SocialValue;
+                }
+
+                else if (a.Theme != null && a.Theme == "Innovation" && a.SocialType == "Mitigation")
+                {
+                    baselineinnovation = (a.SocialValue) * -1;
+                }
+
+                else
+                {
+                    baselineinnovation = 0;
+                }
+
+                BaselineGrowthTotal += baselinegrowth;
+                BaselineJobTotal += baselinejob;
+                BaselineEnvironmentTotal += baselineenvironment;
+                BaselineSocialTotal += baselinesocial;
+                BaselineInnovationTotal += baselineinnovation;
+            }
+        }
+
+        foreach (SocialDTO s in SocialMitigations)
+        {
+            if(s.SocialProgress =="Actual" && s.SocialType == "Mitigation")
+            {
+                achievedCarbonReduction += s.SocialValue;
+            }
+        }
+
+        SocialReductionInfoModel.OrganisationName = orgname;
+        SocialReductionInfoModel.Currency = OrganisationModel.OrganisationCurrency;
+        SocialReductionInfoModel.AchievedReduction = achievedCarbonReduction;
+
+        SocialReductionInfoModel.GrowthTotal = growth;
+        SocialReductionInfoModel.JobTotal = job;
+        SocialReductionInfoModel.EnivromentalTotal = environment;
+        SocialReductionInfoModel.SocialTotal = social;
+        SocialReductionInfoModel.InnovationTotal = innovation;
+        SocialReductionInfoModel.Total = growth + job + environment + social + innovation;
+
+        SocialReductionInfoModel.BaselineGrowthTotal = baselinegrowth;
+        SocialReductionInfoModel.BaselineJobTotal = baselinejob;
+        SocialReductionInfoModel.BaselineEnivromentalTotal = baselineenvironment;
+        SocialReductionInfoModel.BaselineSocialTotal = baselinesocial;
+        SocialReductionInfoModel.BaselineInnovationTotal = baselineinnovation;
+        SocialReductionInfoModel.BaselineTotal = baselinegrowth + baselinejob + baselineenvironment + baselinesocial + baselineinnovation;
+
+        ReducedSocialCompleted.Columns.Add("Name", typeof(string));
+        ReducedSocialCompleted.Columns.Add("Description", typeof(string));
+        ReducedSocialCompleted.Columns.Add("StartDate", typeof(string));
+        ReducedSocialCompleted.Columns.Add("EndDate", typeof(string));
+        ReducedSocialCompleted.Columns.Add("SocialValue", typeof(double));
+
+        ReducedSocialUpcoming.Columns.Add("Name", typeof(string));
+        ReducedSocialUpcoming.Columns.Add("Description", typeof(string));
+        ReducedSocialUpcoming.Columns.Add("StartDate", typeof(string));
+        ReducedSocialUpcoming.Columns.Add("EndDate", typeof(string));
+        ReducedSocialUpcoming.Columns.Add("SocialValue", typeof(double));
+
+        foreach (SocialDTO completed in SocialMitigations)
+        {
+            if(completed.SocialProgress == "Actual")
+            {
+                ReducedSocialCompleted.Rows.Add(new object[] { completed.SocialName, completed.SocialDescription, completed.SocialStartDate.Year, completed.SocialEndDate.Year, completed.SocialValue });
+            }
+        }
+
+        foreach (SocialDTO upcoming in SocialMitigations)
+        {
+            if (upcoming.SocialProgress == "Predicted")
+            {
+                ReducedSocialUpcoming.Rows.Add(new object[] { upcoming.SocialName, upcoming.SocialDescription, upcoming.SocialStartDate.Year, upcoming.SocialEndDate.Year, upcoming.SocialValue });
+            }
+        }
+
+        ReducedSocialGraph.Columns.Add("ProjectName", typeof(string));
+        ReducedSocialGraph.Columns.Add("ProjectValue", typeof(double));
+
+        foreach (SocialDTO upcoming in SocialMitigations)
+        {
+            if (upcoming.SocialProgress == "Actual")
+            {
+                ReducedSocialGraph.Rows.Add(new object[] { upcoming.SocialName, upcoming.SocialValue });
+            }
+        }
+
+        stored.setSocialReductionInfoList(SocialReductionInfoModel);
+        customReport.SetSocialCompletedProjectDataTable(ReducedSocialCompleted);
+        customReport.SetSocialUpcomingProjecthDataTable(ReducedSocialUpcoming);
+        customReport.SetSocialPieChartDataTable(ReducedSocialGraph);
+        customReport.SetCurrency(OrganisationModel.OrganisationCurrency);
+        NavigationManager.NavigateTo("Socialreport");
+
+    }
+}

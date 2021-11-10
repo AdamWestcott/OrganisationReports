@@ -1,0 +1,130 @@
+﻿@using Telerik.ReportViewer.Blazor;
+@page "/Socialreport"
+@using Models
+@using Business.Repository.IRepository
+@using CSharp.Net5.BlazorIntegrationDemo.Controllers
+@using System.Data;
+@inject ICarbonDbItemsRepository CarbonRepository
+@inject NavigationManager NavigationManager
+@inject ISocialRepository SocialRepository
+@inject StoredItems stored
+@inject CustomReportSourceResolver customReport
+
+<link rel="stylesheet" href="https://unpkg.com/@@progress/kendo-theme-default@4.26.0/dist/all.css" />
+<style>
+    .trv-report-viewer {
+        height: 880px;
+        padding-right: 50px;
+    }
+</style>
+<NavLink href="@($"/SocialExceptionReport")" class="btn btn-primary">Exception Report</NavLink>
+<ReportViewer @ref="reportViewer1"
+              ViewerId="rv1"
+              ServiceUrl="/api/reports"
+              ReportSource="@(new ReportSourceOptions
+                              {
+                                  Report = "SocialReductionReport.trdp",
+                                  Parameters = new Dictionary<string, object>
+                                  {
+                                      {"pictureBoxOneParam", OrganisationModel.Logo },
+
+                                      {"CurrencyParam", OrganisationModel.OrganisationCurrency },
+
+                                      {"OrganisationNameParam", SocialReductionInfoModel.OrganisationName },
+
+                                      {"BaselineGrowthParam", SocialReductionInfoModel.BaselineGrowthTotal  },
+
+                                      {"BaselineJobsParam", SocialReductionInfoModel.BaselineJobTotal  },
+
+                                      {"BaselineEnvironmentalParam", SocialReductionInfoModel.BaselineEnivromentalTotal  },
+
+                                      {"BaselineInnovationParam", SocialReductionInfoModel.BaselineInnovationTotal  },
+
+                                      {"BaselineSocialParam", SocialReductionInfoModel.BaselineSocialTotal  },
+
+                                      {"BaselineTotalParam", SocialReductionInfoModel.BaselineTotal  },
+
+                                      {"CurrentDateParam", date.ToString("dd/MM/yyyy") },
+
+                                      {"CurrentYear", "Reporting Year: " + SocialReductionInfoModel.ReportingYear  },
+
+                                      {"BaselineYearParam", "Baseline Year: " + SocialReductionInfoModel.BaselineYear },
+
+                                      {"BaselineDescriptionParam", SocialReductionInfoModel.AdditionalDetails  },
+
+                                      {"CurrentYearParam", SocialReductionInfoModel.ReportingYear  },
+
+                                      {"CurrentGrowthParam", SocialReductionInfoModel.GrowthTotal  },
+
+                                      {"CurrentJobsParam", SocialReductionInfoModel.JobTotal  },
+
+                                      {"CurrentEnvironmentalParam", SocialReductionInfoModel.EnivromentalTotal  },
+
+                                      {"CurrentInnovationParam", SocialReductionInfoModel.InnovationTotal  },
+
+                                      {"CurrentSocialParam", SocialReductionInfoModel.SocialTotal  },
+
+                                      {"CurrentTotalParam", SocialReductionInfoModel.Total  },
+
+                                      {"ReductionTargetParam", " We project that the value of social impacts will decrease over the next five years to  " + SocialReductionInfoModel.Currency + Math.Round(SocialReductionInfoModel.PredictedFiveYearReduction,2) +" by " + fiveYear + ". This is a reduction of "+Math.Round(FiveYearReduction,2) +"% "  },
+
+                                      {"ReductionAchievedParam", " The following social mitigation projects have been completed or implemented since the " + SocialReductionInfoModel.BaselineYear
+                                      + " baseline. The social mitigation value achieved by these schemes equate to "+ SocialReductionInfoModel.Currency + Math.Round(SocialReductionInfoModel.AchievedReduction,2)
+                                      + ", a "+ Math.Round(CRIReduction,2) + "% reduction against the " + SocialReductionInfoModel.BaselineYear + " baseline and the measures will be in effect when performing the contract" },
+                                  }
+                              })"
+              ScaleMode="@(ScaleMode.Specific)"
+              Scale="1.0"></ReportViewer>/
+
+@code {
+    ReportViewer reportViewer1;
+    StoredItems s;
+    double baselineYearTotal = 0.0;
+    double baselineSubtractor = 0.0;
+    double FiveYearReduction = 0.0;
+
+    DateTime date = new DateTime();
+    private SocialReductionInfoDTO SocialReductionInfoModel;
+
+    private IEnumerable<SocialDTO> SocialImpacts { get; set; } = new List<SocialDTO>();
+    private IEnumerable<SocialDTO> SocailMitigations { get; set; } = new List<SocialDTO>();
+    int fiveYear = 0;
+    double reportingYearTotalCarbon = 0.0;
+    double CRIReduction = 0.0;
+    private OrganisationDTO OrganisationModel;
+
+    string orgname = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            SocialImpacts = await SocialRepository.GetAllSocialsOfType(OrganisationModel.OrganisationID, "Impact");
+            SocailMitigations = await SocialRepository.GetAllSocialsOfType(OrganisationModel.OrganisationID, "Mitigation");
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+
+
+        customReport.setReporthPath("Reports/SocialReductionReport.trdp");
+        SocialReductionInfoModel = stored.getSocialReductionInfoList();
+        fiveYear = Convert.ToInt32(SocialReductionInfoModel.ReportingYear) + 5;
+
+        foreach (SocialDTO a in SocialImpacts)
+        {
+            if (a.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear))
+            {
+                reportingYearTotalCarbon += Convert.ToDouble(a.SocialValue);
+            }
+        }
+        DataTable ReducedCarbon = customReport.GetCarbonGraphDataTable();
+        FiveYearReduction = ((reportingYearTotalCarbon - SocialReductionInfoModel.PredictedFiveYearReduction) / reportingYearTotalCarbon) * 100;
+        CRIReduction = (Convert.ToDouble(SocialReductionInfoModel.BaselineTotal) - SocialReductionInfoModel.AchievedReduction) / Convert.ToDouble(SocialReductionInfoModel.BaselineTotal) * 100;
+        var dateAndTime = DateTime.Now;
+        date = dateAndTime.Date;
+
+    }
+
+
+}

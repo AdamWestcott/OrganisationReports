@@ -1,0 +1,130 @@
+﻿@page "/carbonimpact/create"
+@page "/carbonimpact/edit/{Id}"
+@using Models
+@using Business.Repository.IRepository
+@inject IProjectsRepository ProjectsRepositotory
+@inject NavigationManager NavigationManager
+@inject StoredItems stored
+
+<div class="row mt-2 mb-5">
+    <h3 class="card-title text-info mb-3 ml-3">@Title Carbon Emission</h3>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="CarbonImpact" OnValidSubmit="ProjectsHandlerUpsert">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-group">
+                        <label>Emission Name</label>
+                        <InputText @bind-Value="CarbonImpact.CarbonName" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>Emission Description</label>
+                        <InputText @bind-Value="CarbonImpact.CarbonDescription" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>What is the scope of the emission</label>
+                        <InputSelect @bind-Value="CarbonImpact.CarbonScope" class="form-control">
+                            <option>Please Select</option>
+                            <option>Scope 1</option>
+                            <option>Scope 2</option>
+                            <option>Scope 3</option>
+                        </InputSelect>
+                    </div>
+                    <div class="form-group">
+                        <label>What is the Period Of Measurement of the Emission</label>
+                        <InputSelect @bind-Value="CarbonImpact.PeriodOfMeasurement" class="form-control">
+                            <option>Please Select</option>
+                            <option>Weekly</option>
+                            <option>Monthly</option>
+                            <option>Quarterly</option>
+                            <option>Yearly</option>
+                        </InputSelect>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date of Emission</label>
+                        <InputDate @bind-Value="CarbonImpact.CarbonStartDate" class="form-control"></InputDate>
+                    </div>
+                    <div class="form-group">
+                        <label> End Date of Emission</label>
+                        <InputDate @bind-Value="CarbonImpact.CarbonEndDate" class="form-control"></InputDate>
+                    </div>
+                    <div class="form-group">
+                        <label>Kgco2e Amount</label>
+                        <InputNumber @bind-Value="CarbonImpact.KgCo2e" class="form-control"></InputNumber>
+                    </div>
+                    <div class="form-group">
+                        <label>Yearly Kgco2e Amount</label>
+                        <InputNumber @bind-Value="CarbonImpact.YearlyKgCo2e" class="form-control"></InputNumber>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary">@Title Carbon Emission</button>
+                        <NavLink href="/CarbonImpact" class="btn btn-secondary">Back to Index</NavLink>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@code
+{
+    [Parameter]
+    public string? Id { get; set; }
+    private ProjectsDTO CarbonImpact { get; set; } = new ProjectsDTO();
+    private string Title { get; set; } = "Create";
+    private OrganisationDTO OrganisationModel;
+    string orgname = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            orgname = " " + OrganisationModel.OrganisationName + " Projects";
+        }
+
+        if (Id != null)
+        {
+            Title = "Update";
+            CarbonImpact = await ProjectsRepositotory.GetProject(Id);
+        }
+
+        else
+        {
+
+            CarbonImpact = new ProjectsDTO() { CarbonEndDate = DateTime.Now, CarbonStartDate = DateTime.Now };
+            CarbonImpact.CarbonID = Guid.NewGuid().ToString();
+        }
+    }
+
+    private async Task ProjectsHandlerUpsert()
+    {
+        try
+        {
+            if ((CarbonImpact.CarbonID != null) && Title == "Update")
+            {
+                //update
+                var UpdateOrganisation = await ProjectsRepositotory.UpdateProject(CarbonImpact.CarbonID, CarbonImpact);
+            }
+
+            else
+            {
+                CarbonImpact.CarbonType = "Emission";
+                CarbonImpact.CarbonProgress = "Actual";
+                CarbonImpact.CarbonStartDate = DateTime.Now;
+                CarbonImpact.OrganisationID = OrganisationModel.OrganisationID;
+                var CreatedOrganisation = await ProjectsRepositotory.CreateProject(CarbonImpact);
+            }
+
+        }
+        catch
+        {
+
+        }
+
+        NavigationManager.NavigateTo("/CarbonImpact");
+    }
+}

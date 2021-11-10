@@ -1,0 +1,21 @@
+﻿@page "/refresh"
+@inject NavigationManager NavigationManager
+@inject StoredItems stored
+
+    <div class=" row mt-4">
+        <div class="col-8">
+            <h4 class="card-title text-info">'s</h4>
+        </div>
+        </div>
+
+
+
+        @code {
+
+
+            protected override void OnInitialized()
+            {
+                NavigationManager.NavigateTo("");
+            }
+
+        }

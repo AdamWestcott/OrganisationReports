@@ -1,0 +1,137 @@
+﻿@using Telerik.ReportViewer.Blazor;
+@page "/PPN0621CompliantCarbonReductionReport"
+@using Models
+@using Business.Repository.IRepository
+@using CSharp.Net5.BlazorIntegrationDemo.Controllers
+@using System.Data;
+@inject ICarbonDbItemsRepository CarbonRepository
+@inject NavigationManager NavigationManager
+@inject IProjectsRepository ProjectRepository
+@inject StoredItems stored
+@inject CustomReportSourceResolver customReport
+
+<link rel="stylesheet" href="https://unpkg.com/@@progress/kendo-theme-default@4.26.0/dist/all.css" />
+<style>
+    .trv-report-viewer {
+        height: 880px;
+        padding-right: 50px;
+    }
+</style>
+<NavLink href="@($"/CarbonExceptionReport/{ExceptionReport}")" class="btn btn-primary">Exception Report</NavLink>
+<ReportViewer @ref="reportViewer1"
+              ViewerId="rv1"
+              ServiceUrl="/api/reports"
+              ReportSource="@(new ReportSourceOptions
+                              {
+                                  Report = "CarbonReductionReport.trdp",
+                                  Parameters = new Dictionary<string, object>
+                                  {
+                                      {"pictureBoxOneParam", OrganisationModel.Logo },
+
+                                      {"OrganisationNameParam", CarbonReductionInfoModel.OrganisationName },
+
+                                      {"BaselineScope1Param", CarbonReductionInfoModel.BaselineScope1Total  },
+
+                                      {"BaselineScope2Param", CarbonReductionInfoModel.BaselineScope2Total  },
+
+                                      {"BaselineScope3Param", CarbonReductionInfoModel.BaselineScope3Total  },
+
+                                      {"BaselineTotalParam", CarbonReductionInfoModel.BaselineTotal  },
+
+                                      {"CurrentDateParam", date.ToString("dd/MM/yyyy") },
+
+                                      {"CommitmentParam",  CarbonReductionInfoModel.OrganisationName + " is committed to achieving Net Zero emissions by " + CarbonReductionInfoModel.EndYear},
+
+                                      {"BaselineYearParam", "Baseline Year: " + CarbonReductionInfoModel.BaselineYear  },
+
+                                      {"BaselineDescriptionParam", CarbonReductionInfoModel.AdditionalDetails  },
+
+                                      {"CurrentYearParam", CarbonReductionInfoModel.ReportingYear  },
+
+                                      {"CurrentYear", "Reporting Year: " + CarbonReductionInfoModel.ReportingYear  },
+
+                                      {"CurrenYearPlusOneParam", (Convert.ToInt32(CarbonReductionInfoModel.ReportingYear)+1).ToString()  },
+
+                                      {"CurrenYearPlusTwoParam", (Convert.ToInt32(CarbonReductionInfoModel.ReportingYear)+2).ToString()  },
+
+                                      {"CurrenYearPlusThreeParam", (Convert.ToInt32(CarbonReductionInfoModel.ReportingYear)+3).ToString()  },
+
+                                      {"CurrenYearPlusFourParam", (Convert.ToInt32(CarbonReductionInfoModel.ReportingYear)+4).ToString()  },
+
+                                      {"CurrentScope1Param", CarbonReductionInfoModel.Scope1Total  },
+
+                                      {"CurrentScope2Param", CarbonReductionInfoModel.Scope2Total  },
+
+                                      {"CurrentScope3Param", CarbonReductionInfoModel.Scope3Total  },
+
+                                      {"CurrentTotalParam", CarbonReductionInfoModel.Total  },
+
+                                      {"ReductionTargetParam", "We project that carbon emissions will decrease over the next five years to " + Math.Round(CarbonReductionInfoModel.PredictedFiveYearReduction, 2) +" KgCo2e by " + fiveYear + ". This is a reduction of "+ Math.Round(FiveYearReduction, 2) +"% "  },
+
+                                      {"ReductionAchievedParam", "The following environmental management measures and projects have been completed or implemented since the " + CarbonReductionInfoModel.BaselineYear
+                                      + " baseline. The carbon emission reduction achieved by these schemes equate to "+ CarbonReductionInfoModel.AchievedReduction
+                                      + " KgCo2e, a "+ Math.Round(CRIReduction, 2) + "% reduction against the " + CarbonReductionInfoModel.BaselineYear + " baseline and the measures will be in effect when performing the contract" },
+
+                                      {"ReductionProjectsParam", CarbonReductionInfoModel.CompletedProjects  },
+
+                                      {"ReductionFutureParam", CarbonReductionInfoModel.UpcomingProjects  }
+                                  }
+                              })"
+              ScaleMode="@(ScaleMode.Specific)"
+              Scale="1.0"></ReportViewer>/
+
+@code {
+    ReportViewer reportViewer1;
+    StoredItems s;
+    double baselineYearTotal = 0.0;
+    double baselineSubtractor = 0.0;
+    double FiveYearReduction = 0.0;
+    int ExceptionReport = 2;
+
+    DateTime date = new DateTime();
+    private CarbonReductionInfoDTO CarbonReductionInfoModel;
+    private IEnumerable<CarbonDbItemsDTO> CarbonDbItems { get; set; } = new List<CarbonDbItemsDTO>();
+    private IEnumerable<ProjectsDTO> CarbonImpacts { get; set; } = new List<ProjectsDTO>();
+    private IEnumerable<ProjectsDTO> CarbonMitigations { get; set; } = new List<ProjectsDTO>();
+    int fiveYear = 0;
+    double reportingYearTotalCarbon = 0.0;
+    double CRIReduction = 0.0;
+    private OrganisationDTO OrganisationModel;
+
+    string orgname = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            CarbonImpacts = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Emission");
+            CarbonMitigations = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Mitigation");
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+
+        CarbonImpacts = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Emission");
+        CarbonMitigations = await ProjectRepository.GetAllCarbonProjectsOfType(OrganisationModel.OrganisationID, "Mitigation");
+        customReport.setReporthPath("Reports/PPN0621CompliantCarbonReductionReport.trdp");
+        CarbonReductionInfoModel = stored.getCarbonReductionInfoList();
+        CarbonDbItems = await CarbonRepository.GetAllCarbonDbItems();
+        fiveYear = Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) + 5;
+
+        foreach (ProjectsDTO a in CarbonImpacts)
+        {
+            if (a.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear))
+            {
+                reportingYearTotalCarbon += Convert.ToDouble(a.KgCo2e);
+            }
+        }
+        DataTable ReducedCarbon = customReport.GetCarbonGraphDataTable();
+        FiveYearReduction = ((reportingYearTotalCarbon - CarbonReductionInfoModel.PredictedFiveYearReduction) / reportingYearTotalCarbon) * 100;
+        CRIReduction = (Convert.ToDouble(CarbonReductionInfoModel.BaselineTotal) - CarbonReductionInfoModel.AchievedReduction) / Convert.ToDouble(CarbonReductionInfoModel.BaselineTotal) * 100;
+        var dateAndTime = DateTime.Now;
+        date = dateAndTime.Date;
+
+    }
+
+
+}

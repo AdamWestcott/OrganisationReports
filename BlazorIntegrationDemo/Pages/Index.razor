@@ -1,0 +1,106 @@
+﻿@page "/"
+@using Telerik.ReportViewer.Blazor;
+@using Models
+@using Business.Repository.IRepository
+@inject IOrganisationRepository OrganisationRepository
+@inject NavigationManager NavigationManager
+@inject StoredItems stored
+
+<header>
+    <h1>  @orgname</h1>
+</header>
+
+<div class=" row mt-4">
+    <div class="col-8">
+        <h4 class="card-title text-info">Organisation's</h4>
+    </div>
+    <div class="col-3 offset-1">
+        <NavLink href="organisation/create" class="btn btn-info form-control">Add New Organisation</NavLink>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-12">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>Organisation Name</th>
+                    <th>Organisation Currency</th>
+                    <th>
+
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Organisations != null)
+                {
+                    foreach (var organisation in Organisations)
+                    {
+                        <tr>
+                            <td>@organisation.OrganisationName</td>
+                            <td>@organisation.OrganisationCurrency</td>
+                            <td>
+                                <NavLink href="@($"organisation/edit/{organisation.OrganisationID}")" @onclick="() => HandleEdit(organisation.OrganisationID)" class="btn btn-primary">Edit</NavLink>
+                            </td>
+                            <td>
+                                <button class="btn btn-danger" @onclick="() => HandleDelete(organisation.OrganisationID)">Delete</button>
+                            </td>
+                            <td>
+                                <button class="btn btn-success" @onclick="() => ChooseOrg(organisation)">Select Organisation</button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+@code {
+    private IEnumerable<OrganisationDTO> Organisations { get; set; } = new List<OrganisationDTO>();
+    private string? DeleteID { get; set; } = null;
+    private OrganisationDTO OrganisationModel;
+    string orgname = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Organisations = await OrganisationRepository.GetAllOrganisations();
+        OrganisationModel = stored.getOrganisation();
+        if (OrganisationModel.OrganisationName != "")
+        {
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+
+        if (stored.getIsOrgEdited() == true)
+        {
+            OrganisationDTO edited = Organisations.Where(x => x.OrganisationID == OrganisationModel.OrganisationID).Single();
+            stored.setOrganisation(edited);
+            stored.setIsSelected();
+            NavigationManager.NavigateTo("/", true);
+            NavigationManager.NavigateTo("refresh");
+            stored.setIsOrgEdited(false);
+        }
+
+    }
+
+    private async Task ChooseOrg(OrganisationDTO org)
+    {
+        stored.setOrganisation(org);
+        stored.setIsSelected();
+        NavigationManager.NavigateTo("/", true);
+        NavigationManager.NavigateTo("refresh");
+    }
+
+    private async Task HandleDelete(string DeleteID)
+    {
+        var DeleteEmployee = await OrganisationRepository.DeleteOrganisation(DeleteID);
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    private async Task HandleEdit(string EditID)
+    {
+        if (stored.getIsSelected() == true)
+        {
+            stored.setIsOrgEdited(true);
+        }
+    }
+}

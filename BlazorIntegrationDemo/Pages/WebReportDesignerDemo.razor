@@ -1,0 +1,20 @@
+﻿@page "/webreportdesigner"
+@using Telerik.WebReportDesigner.Blazor
+
+<style>
+    #wrd1 {
+        position: relative;
+        height: 880px;
+        padding-right: 50px;
+    }
+</style>
+
+@* Create the WebReportDesignerWidget *@
+
+<p>This Web Report Designer instance works with reports hosted locally using the Reporting REST service. For more information, visit the <a target="_blank" href="https://docs.telerik.com/reporting/web-report-designer">Web Report Designer</a> article.</p>
+<WebReportDesigner DesignerId="wrd1"
+                   ServiceUrl="/api/reportdesigner"
+                   Report="Dashboard.trdp"
+                   ToolboxArea="new ToolboxAreaOptions() { Layout = ToolboxAreaLayout.List }"
+                   PropertiesArea="new PropertiesAreaOptions() { Layout = PropertiesAreaLayout.Categorized }"
+                   PromptOnDiscardingModifiedReport="false" />

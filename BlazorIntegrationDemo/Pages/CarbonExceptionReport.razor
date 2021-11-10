@@ -1,0 +1,132 @@
+﻿@using Telerik.ReportViewer.Blazor;
+@page "/CarbonExceptionReport"
+@page "/CarbonExceptionReport/{Id:int}"
+@using Models
+@using Business.Repository.IRepository
+@using CSharp.Net5.BlazorIntegrationDemo.Controllers
+@using System.Data;
+@inject ICarbonDbItemsRepository CarbonRepository
+@inject NavigationManager NavigationManager
+@inject IProjectsRepository ProjectRepository
+@inject StoredItems stored
+@inject CustomReportSourceResolver customReport
+
+<link rel="stylesheet" href="https://unpkg.com/@@progress/kendo-theme-default@4.26.0/dist/all.css" />
+<style>
+    .trv-report-viewer {
+        height: 880px;
+        padding-right: 50px;
+    }
+</style>
+<NavLink @onclick="@RoutePage" class="btn btn-primary">Back to Carbon Reduction Report</NavLink>
+
+<ReportViewer @ref="reportViewer1"
+              ViewerId="rv1"
+              ServiceUrl="/api/reports"
+              ReportSource="@(new ReportSourceOptions
+                              {
+                                  Report = "ExceptionReport.trdp",
+                                  Parameters = new Dictionary<string, object>
+                                  {
+                                      {"pictureBoxOneParam", OrganisationModel.Logo },
+
+                                      {"CurrentDateParam", date.ToString("dd/MM/yyyy") },
+
+                                      {"ReportingExceptionListParam", exceptions },
+
+                                      {"BaselineExceptionListParam", BaselineExceptions },
+
+                                      {"DuplicationListParam", duplications }
+                                  }
+                              })"
+              ScaleMode="@(ScaleMode.Specific)"
+              Scale="1.0"></ReportViewer>/
+
+@code {
+    ReportViewer reportViewer1;
+
+    DateTime date = new DateTime();
+    private OrganisationDTO OrganisationModel;
+    private IEnumerable<ProjectsDTO> allCarbons { get; set; } = new List<ProjectsDTO>();
+    private List<ProjectsDTO> allCarbonsDuplicateCheck { get; set; } = new List<ProjectsDTO>();
+    private CarbonReductionInfoDTO CarbonReductionInfoModel;
+    string orgname = "";
+
+    [Parameter]
+    public int? Id { get; set; }
+    int count = 1;
+    int duplicateCount = 1;
+    int BaselinCount = 1;
+    string exceptions = "";
+    string BaselineExceptions = "";
+    string duplications = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            allCarbons = await ProjectRepository.GetAllProjects(OrganisationModel.OrganisationID);
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+
+        CarbonReductionInfoModel = stored.getCarbonReductionInfoList();
+        customReport.setReporthPath("Reports/ExceptionReport.trdp");
+        var dateAndTime = DateTime.Now;
+        date = dateAndTime.Date;
+
+        foreach (ProjectsDTO all in allCarbons)
+        {
+            if (all.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) && ((all.CarbonEndDate - all.CarbonStartDate).Days < 364))
+            {
+                exceptions += count + ". " + "The " + all.CarbonType + " " + all.CarbonName + " dates are within the reporting year but not for the full period thefore instead of the inputted " + all.PeriodOfMeasurement + " value of " + all.KgCo2e + " KgCo2e the yearly value of " + all.YearlyKgCo2e + " has been used instead" + Environment.NewLine;
+                count++;
+            }
+        }
+
+        foreach (ProjectsDTO all in allCarbons)
+        {
+            if (all.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.BaselineYear) && ((all.CarbonEndDate - all.CarbonStartDate).Days < 364))
+            {
+                BaselineExceptions += BaselinCount + ". " + "The " + all.CarbonType + " " + all.CarbonName + " dates are within the Baseline year but not for the full period thefore instead of the inputted " + all.PeriodOfMeasurement + " value of " + all.KgCo2e + " KgCo2e the yearly value of " + all.YearlyKgCo2e + " has been used instead" + Environment.NewLine;
+                BaselinCount++;
+            }
+        }
+
+        //duplicates
+
+        allCarbonsDuplicateCheck = allCarbons.Select(s => s).ToList();
+        var duplicatesCheck = allCarbons.Select(x => new { x.CarbonName, x.CarbonDescription, x.CarbonStartDate, x.CarbonEndDate, x.CarbonType, x.CarbonScope, x.KgCo2e, x.CarbonProgress, x.YearlyKgCo2e, x.OrganisationID, x.PeriodOfMeasurement }).ToList();
+
+        var duplicates = duplicatesCheck.GroupBy(s => s)
+        .SelectMany(grp => grp.Skip(1));
+
+        foreach (var all in duplicates)
+        {
+            if (all.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.ReportingYear) || (all.CarbonEndDate.Year == Convert.ToInt32(CarbonReductionInfoModel.BaselineYear)))
+            {
+                duplications += duplicateCount + ". " + "The " + all.CarbonType + " " + all.CarbonName + " is a duplicate item in the time range " + Environment.NewLine;
+                duplicateCount++;
+            }
+        }
+
+
+    }
+
+    private async Task RoutePage()
+    {
+        if(Id == 1)
+        {
+            NavigationManager.NavigateTo("report");
+        }
+
+        if (Id == 2)
+        {
+            NavigationManager.NavigateTo("PPN0621CompliantCarbonReductionReport");
+        }
+    }
+
+
+}
+

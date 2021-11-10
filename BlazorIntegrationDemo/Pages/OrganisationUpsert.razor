@@ -1,0 +1,117 @@
+﻿@page "/organisation/create"
+@page "/organisation/edit/{Id}"
+@using Models
+@using Business.Repository.IRepository
+@using System.Drawing
+@using System.IO
+@inject IOrganisationRepository OrganisationRepository
+@inject NavigationManager NavigationManager
+<div class="row mt-2 mb-5">
+    <h3 class="card-title text-info mb-3 ml-3">@Title Organisation</h3>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="OrganisationModel" Context="formContext">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-group">
+                        <label>Organisation Name</label>
+                        <InputText @bind-Value="OrganisationModel.OrganisationName" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <label>Organisation Currency</label>
+                        <InputText @bind-Value="OrganisationModel.OrganisationCurrency" class="form-control"></InputText>
+                    </div>
+                    <div class="form-group">
+                        <button onclick="document.getElementById('picker').click()">Select Logo</button>
+                        <InputFile id="picker" OnChange="@OnInputFileChange" accept=".jpeg, .png" hidden></InputFile>
+                    </div>
+                    <div>
+                        <br />
+                        <br />
+                    </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary"  @onclick="@(() => OrganisationHandlerUpsert())">@Title Organisation</button>
+                            <NavLink href="/" class="btn btn-secondary">Back to Index</NavLink>
+                        </div>
+</EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code
+{
+    [Parameter]
+    public string? Id { get; set; }
+    private OrganisationDTO OrganisationModel { get; set; } = new OrganisationDTO();
+    private string Title { get; set; } = "Create";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id != null)
+        {
+            Title = "Update";
+            OrganisationModel = await OrganisationRepository.GetOrganisation(Id);
+        }
+
+        else
+        {
+
+            OrganisationModel = new OrganisationDTO();
+            OrganisationModel.OrganisationID = Guid.NewGuid().ToString();
+        }
+    }
+
+    private async Task OnInputFileChange(InputFileChangeEventArgs e)
+    {
+
+        var file = e.File;
+
+        Stream stream = file.OpenReadStream();
+        var path = Path.GetFullPath(@"wwwroot\Pictures\") + file.Name;
+        FileStream fs = File.Create(path);
+        await stream.CopyToAsync(fs);
+        stream.Close();
+        fs.Close();
+
+
+        using (Image image = Image.FromFile(path))
+        {
+            using (MemoryStream m = new MemoryStream())
+            {
+                image.Save(m, image.RawFormat);
+                byte[] imageBytes = m.ToArray();
+
+                // Convert byte[] to Base64 String
+                string base64String = Convert.ToBase64String(imageBytes);
+                OrganisationModel.Logo = base64String;
+            }
+        }
+
+    }
+
+    private async Task OrganisationHandlerUpsert()
+    {
+        try
+        {
+            if ((OrganisationModel.OrganisationID != null) && Title == "Update")
+            {
+                //update
+                var UpdateOrganisation = await OrganisationRepository.UpdateOrganisation(OrganisationModel.OrganisationID, OrganisationModel);
+            }
+
+            else
+            {
+                var CreatedOrganisation = await OrganisationRepository.CreateOrganisation(OrganisationModel);
+            }
+
+        }
+        catch
+        {
+
+        }
+
+        NavigationManager.NavigateTo("/");
+    }
+}

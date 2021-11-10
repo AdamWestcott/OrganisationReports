@@ -1,0 +1,112 @@
+﻿@using Telerik.ReportViewer.Blazor;
+@page "/SocialExceptionReport"
+@using Models
+@using Business.Repository.IRepository
+@using CSharp.Net5.BlazorIntegrationDemo.Controllers
+@using System.Data;
+@inject ICarbonDbItemsRepository CarbonRepository
+@inject NavigationManager NavigationManager
+@inject ISocialRepository SocialRepository
+@inject StoredItems stored
+@inject CustomReportSourceResolver customReport
+
+<link rel="stylesheet" href="https://unpkg.com/@@progress/kendo-theme-default@4.26.0/dist/all.css" />
+<style>
+    .trv-report-viewer {
+        height: 880px;
+        padding-right: 50px;
+    }
+</style>
+<NavLink href="@($"/Socialreport")" class="btn btn-primary">Back to Social Reduction Report</NavLink>
+
+<ReportViewer @ref="reportViewer1"
+              ViewerId="rv1"
+              ServiceUrl="/api/reports"
+              ReportSource="@(new ReportSourceOptions
+                              {
+                                  Report = "SocialExceptionReport.trdp",
+                                  Parameters = new Dictionary<string, object>
+                                  {
+                                      {"pictureBoxOneParam", OrganisationModel.Logo },
+
+                                      {"CurrentDateParam", date.ToString("dd/MM/yyyy") },
+                                      
+                                      {"ReportingExceptionListParam", exceptions },
+
+                                      {"BaselineExceptionListParam", BaselineExceptions },
+
+                                      {"DuplicationListParam", duplications }
+                                  }
+                              })"
+              ScaleMode="@(ScaleMode.Specific)"
+              Scale="1.0"></ReportViewer>/
+
+@code {
+    ReportViewer reportViewer1;
+
+    DateTime date = new DateTime();
+    private OrganisationDTO OrganisationModel;
+    private IEnumerable<SocialDTO> allSocial { get; set; } = new List<SocialDTO>();
+    private List<SocialDTO> allSocialDuplicateCheck { get; set; } = new List<SocialDTO>();
+    private SocialReductionInfoDTO SocialReductionInfoModel;
+    string orgname = "";
+    int count = 1;
+    int duplicateCount = 1;
+    int BaselinCount = 1;
+    string exceptions = "";
+    string BaselineExceptions = "";
+    string duplications = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        OrganisationModel = stored.getOrganisation();
+
+        if (OrganisationModel.OrganisationName != "")
+        {
+            allSocial = await SocialRepository.GetAllSocials(OrganisationModel.OrganisationID);
+            orgname = " " + OrganisationModel.OrganisationName;
+        }
+        SocialReductionInfoModel = stored.getSocialReductionInfoList();
+        customReport.setReporthPath("Reports/SocialExceptionReport.trdp");
+        var dateAndTime = DateTime.Now;
+        date = dateAndTime.Date;
+
+        foreach (SocialDTO all in allSocial)
+        {
+            if (all.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear) && ((all.SocialEndDate - all.SocialStartDate).Days < 364))
+            {
+                exceptions += count + ". " + "The " + all.SocialType + " " + all.SocialName + " dates are within the reporting year but not for the full period thefore instead of the inputted " + all.PeriodOfMeasurement + " value of " +OrganisationModel.OrganisationCurrency+ all.SocialValue + " the yearly value of " + OrganisationModel.OrganisationCurrency + all.YearlySocialValue + " has been used instead" + Environment.NewLine;
+                count++;
+            }
+        }
+
+        foreach (SocialDTO all in allSocial)
+        {
+            if (all.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.BaselineYear) && ((all.SocialEndDate - all.SocialStartDate).Days < 364))
+            {
+                BaselineExceptions += BaselinCount + ". " + "The " + all.SocialType + " " + all.SocialName + " dates are within the reporting year but not for the full period thefore instead of the inputted " + all.PeriodOfMeasurement + " value of " + OrganisationModel.OrganisationCurrency + all.SocialValue + " the yearly value of " + OrganisationModel.OrganisationCurrency + all.YearlySocialValue + " has been used instead" + Environment.NewLine;
+                BaselinCount++;
+            }
+        }
+
+        //duplicates
+
+        allSocialDuplicateCheck = allSocial.Select(s => s).ToList();
+        var duplicatesCheck = allSocial.Select(x => new { x.SocialName, x.SocialDescription, x.SocialStartDate, x.SocialEndDate, x.SocialType, x.SocialValue, x.SocialProgress, x.YearlySocialValue, x.OrganisationID, x.PeriodOfMeasurement }).ToList();
+
+        var duplicates = duplicatesCheck.GroupBy(s => s)
+        .SelectMany(grp => grp.Skip(1));
+
+        foreach (var all in duplicates)
+        {
+            if (all.SocialEndDate.Year == Convert.ToInt32(SocialReductionInfoModel.ReportingYear))
+            {
+                duplications += duplicateCount + ". " + "The " + all.SocialType + " " + all.SocialName + " is a duplicate item within the time range " + Environment.NewLine;
+                duplicateCount++;
+            }
+        }
+
+    }
+
+
+}
